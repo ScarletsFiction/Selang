@@ -1,0 +1,6 @@
+{
+    "require": {
+        "scarletsfiction/scarlets": "^0.8.0",
+        "nikic/php-parser": "^4.2"
+    }
+}

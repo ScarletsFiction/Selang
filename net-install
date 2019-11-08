@@ -1,0 +1,115 @@
+<?php
+if(file_exists('scarlets')){
+	if(file_exists('vendor/scarletsfiction/scarlets/')){
+		echo("Looks like Scarlets Framework already installed\n");
+		die("Use `php scarlets upgrade` if you want to update\n");
+	}
+}
+
+$opts = [
+  'http'=>[
+    'method'=>"GET",
+    'header'=>"User-Agent: ScarletsFramework\n"
+  ]
+];
+
+$context = stream_context_create($opts);
+
+$root = __DIR__;
+
+$status = file_get_contents('https://api.travis-ci.org/ScarletsFiction/Scarlets.svg?branch=master', 0, $context);
+if(strpos($status, 'fail')!==false){
+	echo("\nCurrently the framework is unstable");
+}
+
+echo(" - Determining archive size\n");
+$status = file_get_contents('https://api.github.com/repos/ScarletsFiction/Scarlets', 0, $context);
+try{
+	$filesize = round(json_decode($status, true)['size']);
+}catch(\Exception $e){
+	$filesize = '?';
+}
+
+echo(" - Downloading repository ($filesize KB)\n");
+file_put_contents('master.zip', file_get_contents('https://github.com/ScarletsFiction/Scarlets/archive/master.zip'));
+
+echo(" - Extracting files\n");
+$zip = new ZipArchive;
+$res = $zip->open('master.zip');
+
+if(!file_exists($root.'/vendor/scarletsfiction/'))
+	mkdir($root.'/vendor/scarletsfiction/', 0777, true);
+
+deleteContent($root.'/vendor/scarletsfiction/scarlets_backup/', true);
+
+if(file_exists($root.'/vendor/scarletsfiction/scarlets'))
+	rename($root.'/vendor/scarletsfiction/scarlets', $root.'/vendor/scarletsfiction/scarlets_backup');
+
+$zip->extractTo($root.'/vendor/scarletsfiction/');
+$zip->close();
+
+rename($root.'/vendor/scarletsfiction/Scarlets-master', $root.'/vendor/scarletsfiction/scarlets');
+
+// Check if project already exist
+if(file_exists($root.'/app') && file_exists($root.'/config') && file_exists($root.'/routes') && file_exists($root.'/scarlets'))
+	echo " + Project already exist\n";
+
+// Create new project
+else {
+	echo "\nDo you want to use this directory for your project? (y/n) ";
+	$handle = fopen ("php://stdin","r");
+	$line = fgets($handle);
+	if(trim($line) != 'y'){
+	    echo "Please type your directory:\n";
+		$root = trim(fgets($handle));
+		if(!file_exists($root))
+			mkdir($root, 0777, true);
+	}
+	fclose($handle);
+
+	echo(" - Moving files\n");
+	$list = array_slice(scandir($root.'/vendor/scarletsfiction/scarlets/example/'), 2);
+	foreach($list as $path){
+		// Skip if already exist
+		if(file_exists($root.'/'.$path))
+			continue;
+
+		// Move files
+		rename($root.'/vendor/scarletsfiction/scarlets/example/'.$path, $root.'/'.$path);
+	}
+
+	echo(" - Changing root folder (root.php)\n");
+	file_put_contents($root.'/root.php', str_replace('/../require.php', '/vendor/scarletsfiction/scarlets/require.php', file_get_contents($root.'/root.php')));
+}
+
+echo(" - Delete temporary file\n");
+try{
+	deleteContent($root.'/vendor/scarletsfiction/scarlets/example/', true);
+	deleteContent($root.'/vendor/scarletsfiction/scarlets/evaluate/', true);
+	deleteContent($root.'/vendor/scarletsfiction/scarlets/images/', true);
+	deleteContent($root.'/vendor/scarletsfiction/scarlets/tests/', true);
+	unlink('master.zip');
+} catch(\Exception $e) {
+	echo(" - Some temporary files was not found");
+}
+
+$list = ['.gitignore', '.htaccess', '.travis.yml', 'phpunit.xml'];
+foreach ($list as &$value) {
+	unlink($root.'/vendor/scarletsfiction/scarlets/'.$value);
+}
+echo("\n - Task finished\n");
+
+function deleteContent($path, $pathAlso = true){
+	if(!file_exists($path) || !is_dir($path)) return;
+
+	$iterator = new DirectoryIterator($path);
+	foreach($iterator as $fileinfo){
+		if($fileinfo->isDot()) continue;
+		elseif($fileinfo->isDir())
+			deleteContent($fileinfo->getPathname(), true);
+		elseif($fileinfo->isFile())
+			@unlink($fileinfo->getPathname());
+	}
+	if($pathAlso) @rmdir($path);
+	return true;
+}
