@@ -19,3 +19,6 @@ When you want to compile, you need to specify the main script (ex: `Playground/t
 ```sh
 $ scarlets selang Playground/test.php
 ```
+
+### Usage Flow
+The CLI is controlled from `routes/console.php` that will call the library on `app/Library/Selang/Loader.php`.
